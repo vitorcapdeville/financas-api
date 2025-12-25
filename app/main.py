@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_db_and_tables
-from app.routers import transacoes, importacao
+from app.routers import transacoes, importacao, configuracoes
 
 app = FastAPI(
     title="Finanças Pessoais API",
@@ -22,6 +22,7 @@ app.add_middleware(
 # Incluir routers
 app.include_router(transacoes.router)
 app.include_router(importacao.router)
+app.include_router(configuracoes.router)
 
 
 @app.on_event("startup")

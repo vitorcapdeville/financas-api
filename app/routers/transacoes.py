@@ -26,6 +26,8 @@ def criar_transacao(
 def listar_transacoes(
     mes: Optional[int] = Query(None, ge=1, le=12),
     ano: Optional[int] = Query(None, ge=2000),
+    data_inicio: Optional[date] = None,
+    data_fim: Optional[date] = None,
     categoria: Optional[str] = None,
     tipo: Optional[str] = None,
     session: Session = Depends(get_session)
@@ -33,15 +35,21 @@ def listar_transacoes(
     """Lista todas as transações com filtros opcionais"""
     query = select(Transacao)
     
-    if mes and ano:
-        data_inicio = date(ano, mes, 1)
-        if mes < 12:
-            data_fim = date(ano, mes + 1, 1)
-        else:
-            data_fim = date(ano + 1, 1, 1)
+    # Prioriza data_inicio/data_fim se fornecidos, senão usa mes/ano
+    if data_inicio and data_fim:
         query = query.where(
             Transacao.data >= data_inicio,
-            Transacao.data < data_fim
+            Transacao.data <= data_fim
+        )
+    elif mes and ano:
+        data_inicio_calc = date(ano, mes, 1)
+        if mes < 12:
+            data_fim_calc = date(ano, mes + 1, 1)
+        else:
+            data_fim_calc = date(ano + 1, 1, 1)
+        query = query.where(
+            Transacao.data >= data_inicio_calc,
+            Transacao.data < data_fim_calc
         )
     
     if categoria:
@@ -105,20 +113,29 @@ def deletar_transacao(
 
 @router.get("/resumo/mensal")
 def resumo_mensal(
-    mes: int = Query(..., ge=1, le=12),
-    ano: int = Query(..., ge=2000),
+    mes: Optional[int] = Query(None, ge=1, le=12),
+    ano: Optional[int] = Query(None, ge=2000),
+    data_inicio: Optional[date] = None,
+    data_fim: Optional[date] = None,
     session: Session = Depends(get_session)
 ):
     """Retorna resumo mensal de entradas e saídas por categoria"""
-    data_inicio = date(ano, mes, 1)
-    if mes < 12:
-        data_fim = date(ano, mes + 1, 1)
+    # Prioriza data_inicio/data_fim se fornecidos, senão usa mes/ano
+    if data_inicio and data_fim:
+        periodo_inicio = data_inicio
+        periodo_fim = data_fim
+    elif mes and ano:
+        periodo_inicio = date(ano, mes, 1)
+        if mes < 12:
+            periodo_fim = date(ano, mes + 1, 1)
+        else:
+            periodo_fim = date(ano + 1, 1, 1)
     else:
-        data_fim = date(ano + 1, 1, 1)
+        raise HTTPException(status_code=400, detail="Forneça mes/ano ou data_inicio/data_fim")
     
     query = select(Transacao).where(
-        Transacao.data >= data_inicio,
-        Transacao.data < data_fim
+        Transacao.data >= periodo_inicio,
+        Transacao.data <= periodo_fim
     )
     
     transacoes = session.exec(query).all()
