@@ -62,53 +62,14 @@ def listar_transacoes(
     return transacoes
 
 
-@router.get("/{transacao_id}", response_model=TransacaoRead)
-def obter_transacao(
-    transacao_id: int,
-    session: Session = Depends(get_session)
-):
-    """Obtém uma transação específica pelo ID"""
-    transacao = session.get(Transacao, transacao_id)
-    if not transacao:
-        raise HTTPException(status_code=404, detail="Transação não encontrada")
-    return transacao
-
-
-@router.patch("/{transacao_id}", response_model=TransacaoRead)
-def atualizar_transacao(
-    transacao_id: int,
-    transacao_update: TransacaoUpdate,
-    session: Session = Depends(get_session)
-):
-    """Atualiza uma transação existente"""
-    db_transacao = session.get(Transacao, transacao_id)
-    if not db_transacao:
-        raise HTTPException(status_code=404, detail="Transação não encontrada")
-    
-    update_data = transacao_update.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_transacao, key, value)
-    
-    db_transacao.atualizado_em = datetime.now()
-    session.add(db_transacao)
-    session.commit()
-    session.refresh(db_transacao)
-    return db_transacao
-
-
-@router.delete("/{transacao_id}")
-def deletar_transacao(
-    transacao_id: int,
-    session: Session = Depends(get_session)
-):
-    """Deleta uma transação"""
-    transacao = session.get(Transacao, transacao_id)
-    if not transacao:
-        raise HTTPException(status_code=404, detail="Transação não encontrada")
-    
-    session.delete(transacao)
-    session.commit()
-    return {"message": "Transação deletada com sucesso"}
+@router.get("/categorias", response_model=List[str])
+def listar_categorias(session: Session = Depends(get_session)):
+    """Lista todas as categorias únicas existentes"""
+    query = select(Transacao.categoria).distinct()
+    categorias = session.exec(query).all()
+    # Filtra None e retorna lista ordenada
+    categorias_validas = [c for c in categorias if c is not None]
+    return sorted(categorias_validas)
 
 
 @router.get("/resumo/mensal")
@@ -163,3 +124,53 @@ def resumo_mensal(
         "entradas_por_categoria": entradas,
         "saidas_por_categoria": saidas
     }
+
+
+@router.get("/{transacao_id}", response_model=TransacaoRead)
+def obter_transacao(
+    transacao_id: int,
+    session: Session = Depends(get_session)
+):
+    """Obtém uma transação específica pelo ID"""
+    transacao = session.get(Transacao, transacao_id)
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Transação não encontrada")
+    return transacao
+
+
+@router.patch("/{transacao_id}", response_model=TransacaoRead)
+def atualizar_transacao(
+    transacao_id: int,
+    transacao_update: TransacaoUpdate,
+    session: Session = Depends(get_session)
+):
+    """Atualiza uma transação existente"""
+    db_transacao = session.get(Transacao, transacao_id)
+    if not db_transacao:
+        raise HTTPException(status_code=404, detail="Transação não encontrada")
+    
+    update_data = transacao_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_transacao, key, value)
+    
+    db_transacao.atualizado_em = datetime.now()
+    session.add(db_transacao)
+    session.commit()
+    session.refresh(db_transacao)
+    return db_transacao
+
+
+@router.delete("/{transacao_id}")
+def deletar_transacao(
+    transacao_id: int,
+    session: Session = Depends(get_session)
+):
+    """Deleta uma transação"""
+    transacao = session.get(Transacao, transacao_id)
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Transação não encontrada")
+    
+    session.delete(transacao)
+    session.commit()
+    return {"message": "Transação deletada com sucesso"}
+
