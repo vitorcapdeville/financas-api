@@ -167,6 +167,22 @@ uv add fastapi uvicorn sqlmodel psycopg2-binary python-dotenv pydantic pydantic-
 uv sync
 ```
 
+### Configuração de Ambiente (.env)
+
+**CRÍTICO**: Antes de executar, configure o arquivo `.env`:
+
+```bash
+# Copie o template
+cp .env.example .env
+```
+
+O arquivo `.env` deve conter:
+```dotenv
+DATABASE_URL=postgresql://financas_user:financas_pass@localhost:5432/financas_db
+```
+
+**PostgreSQL deve estar rodando** antes de iniciar a aplicação. As tabelas são criadas automaticamente no primeiro startup via `create_db_and_tables()`.
+
 ### Adicionar Nova Dependência
 ```bash
 # Use uv add (não uv pip install!)
@@ -181,6 +197,8 @@ uv add nome-do-pacote
 # Use uv run para executar comandos no ambiente
 uv run uvicorn app.main:app --reload
 ```
+
+**VS Code Task**: Existe uma task configurada "Run FastAPI" que pode ser executada via Command Palette (Ctrl+Shift+P → "Tasks: Run Task").
 
 ## Verificação Pós-Modificação
 
