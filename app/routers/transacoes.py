@@ -160,17 +160,5 @@ def atualizar_transacao(
     return db_transacao
 
 
-@router.delete("/{transacao_id}")
-def deletar_transacao(
-    transacao_id: int,
-    session: Session = Depends(get_session)
-):
-    """Deleta uma transação"""
-    transacao = session.get(Transacao, transacao_id)
-    if not transacao:
-        raise HTTPException(status_code=404, detail="Transação não encontrada")
-    
-    session.delete(transacao)
-    session.commit()
-    return {"message": "Transação deletada com sucesso"}
+
 
