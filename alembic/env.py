@@ -33,6 +33,7 @@ if config.config_file_name is not None:
 from sqlmodel import SQLModel
 from app.models import Transacao  # noqa: F401
 from app.models_config import Configuracao  # noqa: F401
+from app.models_tags import Tag, TransacaoTag  # noqa: F401
 
 target_metadata = SQLModel.metadata
 

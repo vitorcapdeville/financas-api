@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, or_
+from sqlmodel import Session, select, or_, func
 from typing import List, Optional
 from datetime import date, datetime
 
 from app.database import get_session
-from app.models import Transacao, TransacaoCreate, TransacaoUpdate, TransacaoRead
+from app.models import Transacao, TransacaoCreate, TransacaoUpdate
 from app.models_config import Configuracao
+from app.models_tags import Tag, TransacaoTag, TagRead
+from app.schemas import TransacaoReadWithTags
 
 router = APIRouter(prefix="/transacoes", tags=["Transações"])
 
@@ -17,7 +19,7 @@ def obter_criterio_data(session: Session) -> str:
     return config.valor if config else "data_transacao"
 
 
-@router.post("/", response_model=TransacaoRead)
+@router.post("/", response_model=TransacaoReadWithTags)
 def criar_transacao(
     transacao: TransacaoCreate,
     session: Session = Depends(get_session)
@@ -30,10 +32,14 @@ def criar_transacao(
     session.add(db_transacao)
     session.commit()
     session.refresh(db_transacao)
-    return db_transacao
+    
+    # Retorna com tags vazias
+    transacao_dict = db_transacao.model_dump()
+    transacao_dict['tags'] = []
+    return TransacaoReadWithTags(**transacao_dict)
 
 
-@router.get("/", response_model=List[TransacaoRead])
+@router.get("/", response_model=List[TransacaoReadWithTags])
 def listar_transacoes(
     mes: Optional[int] = Query(None, ge=1, le=12),
     ano: Optional[int] = Query(None, ge=2000),
@@ -41,12 +47,16 @@ def listar_transacoes(
     data_fim: Optional[date] = None,
     categoria: Optional[str] = None,
     tipo: Optional[str] = None,
+    tags: Optional[str] = Query(None, description="IDs de tags separados por vírgula (ex: '1,2,3')"),
     session: Session = Depends(get_session)
 ):
     """Lista todas as transações com filtros opcionais
     
     O filtro de data pode usar o campo 'data' (data da transação) ou 'data_fatura'
     (data de pagamento da fatura) dependendo da configuração 'criterio_data_transacao'.
+    
+    O filtro de tags aceita IDs separados por vírgula e retorna transações que possuem
+    QUALQUER UMA das tags especificadas (operação OR).
     """
     query = select(Transacao)
     
@@ -99,8 +109,30 @@ def listar_transacoes(
     if tipo:
         query = query.where(Transacao.tipo == tipo)
     
+    # Filtro por tags
+    if tags:
+        try:
+            tag_ids = [int(tag_id.strip()) for tag_id in tags.split(',')]
+            # Join com TransacaoTag para filtrar transações que possuem qualquer uma das tags
+            query = query.join(TransacaoTag).where(TransacaoTag.tag_id.in_(tag_ids)).distinct()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="IDs de tags inválidos")
+    
     transacoes = session.exec(query).all()
-    return transacoes
+    
+    # Carrega as tags para cada transação
+    result = []
+    for transacao in transacoes:
+        # Busca as tags associadas
+        tags_query = select(Tag).join(TransacaoTag).where(TransacaoTag.transacao_id == transacao.id)
+        transacao_tags = session.exec(tags_query).all()
+        
+        # Cria o TransacaoReadWithTags com as tags
+        transacao_dict = transacao.model_dump()
+        transacao_dict['tags'] = [TagRead.model_validate(tag) for tag in transacao_tags]
+        result.append(TransacaoReadWithTags(**transacao_dict))
+    
+    return result
 
 
 @router.get("/categorias", response_model=List[str])
@@ -119,6 +151,7 @@ def resumo_mensal(
     ano: Optional[int] = Query(None, ge=2000),
     data_inicio: Optional[date] = None,
     data_fim: Optional[date] = None,
+    tags: Optional[str] = Query(None, description="IDs de tags separados por vírgula (ex: '1,2,3')"),
     session: Session = Depends(get_session)
 ):
     """Retorna resumo mensal de entradas e saídas por categoria
@@ -157,6 +190,15 @@ def resumo_mensal(
             Transacao.data <= periodo_fim
         )
     
+    # Filtro por tags
+    if tags:
+        try:
+            tag_ids = [int(tag_id.strip()) for tag_id in tags.split(',')]
+            # Join com TransacaoTag para filtrar transações que possuem qualquer uma das tags
+            query = query.join(TransacaoTag).where(TransacaoTag.tag_id.in_(tag_ids)).distinct()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="IDs de tags inválidos")
+    
     transacoes = session.exec(query).all()
     
     entradas = {}
@@ -184,7 +226,7 @@ def resumo_mensal(
     }
 
 
-@router.get("/{transacao_id}", response_model=TransacaoRead)
+@router.get("/{transacao_id}", response_model=TransacaoReadWithTags)
 def obter_transacao(
     transacao_id: int,
     session: Session = Depends(get_session)
@@ -193,10 +235,18 @@ def obter_transacao(
     transacao = session.get(Transacao, transacao_id)
     if not transacao:
         raise HTTPException(status_code=404, detail="Transação não encontrada")
-    return transacao
+    
+    # Busca as tags associadas
+    tags_query = select(Tag).join(TransacaoTag).where(TransacaoTag.transacao_id == transacao.id)
+    transacao_tags = session.exec(tags_query).all()
+    
+    # Cria o TransacaoReadWithTags com as tags
+    transacao_dict = transacao.model_dump()
+    transacao_dict['tags'] = [TagRead.model_validate(tag) for tag in transacao_tags]
+    return TransacaoReadWithTags(**transacao_dict)
 
 
-@router.patch("/{transacao_id}", response_model=TransacaoRead)
+@router.patch("/{transacao_id}", response_model=TransacaoReadWithTags)
 def atualizar_transacao(
     transacao_id: int,
     transacao_update: TransacaoUpdate,
@@ -219,10 +269,18 @@ def atualizar_transacao(
     session.add(db_transacao)
     session.commit()
     session.refresh(db_transacao)
-    return db_transacao
+    
+    # Busca as tags associadas
+    tags_query = select(Tag).join(TransacaoTag).where(TransacaoTag.transacao_id == db_transacao.id)
+    transacao_tags = session.exec(tags_query).all()
+    
+    # Cria o TransacaoReadWithTags com as tags
+    transacao_dict = db_transacao.model_dump()
+    transacao_dict['tags'] = [TagRead.model_validate(tag) for tag in transacao_tags]
+    return TransacaoReadWithTags(**transacao_dict)
 
 
-@router.post("/{transacao_id}/restaurar-valor", response_model=TransacaoRead)
+@router.post("/{transacao_id}/restaurar-valor", response_model=TransacaoReadWithTags)
 def restaurar_valor_original(
     transacao_id: int,
     session: Session = Depends(get_session)
@@ -242,4 +300,107 @@ def restaurar_valor_original(
     session.add(db_transacao)
     session.commit()
     session.refresh(db_transacao)
-    return db_transacao
+    
+    # Busca as tags associadas
+    tags_query = select(Tag).join(TransacaoTag).where(TransacaoTag.transacao_id == db_transacao.id)
+    transacao_tags = session.exec(tags_query).all()
+    
+    # Cria o TransacaoReadWithTags com as tags
+    transacao_dict = db_transacao.model_dump()
+    transacao_dict['tags'] = [TagRead.model_validate(tag) for tag in transacao_tags]
+    return TransacaoReadWithTags(**transacao_dict)
+
+
+@router.post("/{transacao_id}/tags/{tag_id}", status_code=204)
+def adicionar_tag_transacao(
+    transacao_id: int,
+    tag_id: int,
+    session: Session = Depends(get_session)
+):
+    """Adiciona uma tag a uma transação"""
+    # Verifica se transação existe
+    transacao = session.get(Transacao, transacao_id)
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Transação não encontrada")
+    
+    # Verifica se tag existe
+    tag = session.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag não encontrada")
+    
+    # Verifica se associação já existe
+    existing = session.exec(
+        select(TransacaoTag).where(
+            TransacaoTag.transacao_id == transacao_id,
+            TransacaoTag.tag_id == tag_id
+        )
+    ).first()
+    
+    if existing:
+        # Já está associada, retorna sucesso
+        return None
+    
+    # Cria a associação
+    transacao_tag = TransacaoTag(transacao_id=transacao_id, tag_id=tag_id)
+    session.add(transacao_tag)
+    
+    # Atualiza timestamp da transação
+    transacao.atualizado_em = datetime.now()
+    session.add(transacao)
+    
+    session.commit()
+    return None
+
+
+@router.delete("/{transacao_id}/tags/{tag_id}", status_code=204)
+def remover_tag_transacao(
+    transacao_id: int,
+    tag_id: int,
+    session: Session = Depends(get_session)
+):
+    """Remove uma tag de uma transação"""
+    # Verifica se transação existe
+    transacao = session.get(Transacao, transacao_id)
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Transação não encontrada")
+    
+    # Busca a associação
+    transacao_tag = session.exec(
+        select(TransacaoTag).where(
+            TransacaoTag.transacao_id == transacao_id,
+            TransacaoTag.tag_id == tag_id
+        )
+    ).first()
+    
+    if not transacao_tag:
+        # Não está associada, retorna sucesso
+        return None
+    
+    # Remove a associação
+    session.delete(transacao_tag)
+    
+    # Atualiza timestamp da transação
+    transacao.atualizado_em = datetime.now()
+    session.add(transacao)
+    
+    session.commit()
+    return None
+
+
+@router.get("/{transacao_id}/tags", response_model=List[TagRead])
+def listar_tags_transacao(
+    transacao_id: int,
+    session: Session = Depends(get_session)
+):
+    """Lista todas as tags de uma transação"""
+    # Verifica se transação existe
+    transacao = session.get(Transacao, transacao_id)
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Transação não encontrada")
+    
+    # Busca as tags associadas
+    tags = session.exec(
+        select(Tag).join(TransacaoTag).where(TransacaoTag.transacao_id == transacao_id)
+    ).all()
+    
+    return tags

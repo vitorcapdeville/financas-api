@@ -1,7 +1,10 @@
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Relationship
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING, List
 from enum import Enum
+
+if TYPE_CHECKING:
+    from app.models_tags import TransacaoTag
 
 
 class TipoTransacao(str, Enum):
@@ -23,6 +26,9 @@ class Transacao(SQLModel, table=True):
     data_fatura: Optional[date] = Field(default=None, description="Data de fechamento/pagamento da fatura (para transações de cartão)")
     criado_em: datetime = Field(default_factory=datetime.now)
     atualizado_em: datetime = Field(default_factory=datetime.now)
+
+    # Relacionamento com tags
+    tags: list["TransacaoTag"] = Relationship(back_populates="transacao")
 
 
 class TransacaoCreate(SQLModel):
@@ -62,3 +68,4 @@ class TransacaoRead(SQLModel):
     data_fatura: Optional[date]
     criado_em: datetime
     atualizado_em: datetime
+    tags: List = []
