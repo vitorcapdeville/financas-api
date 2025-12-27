@@ -19,9 +19,10 @@ async def importar_extrato(
     Importa transações de um arquivo de extrato bancário (CSV ou Excel)
     
     Formato esperado:
-    - data: formato DD/MM/YYYY ou YYYY-MM-DD
-    - descricao: texto descritivo
-    - valor: número (positivo para entradas, negativo para saídas)
+    - data: formato DD/MM/YYYY ou YYYY-MM-DD (obrigatório)
+    - descricao: texto descritivo (obrigatório)
+    - valor: número (positivo para entradas, negativo para saídas) (obrigatório)
+    - categoria: texto (opcional)
     """
     if not arquivo.filename.endswith(('.csv', '.xlsx', '.xls')):
         raise HTTPException(
@@ -105,9 +106,11 @@ async def importar_fatura(
     Importa transações de uma fatura de cartão de crédito (CSV ou Excel)
     
     Formato esperado:
-    - data: formato DD/MM/YYYY ou YYYY-MM-DD
-    - descricao: texto descritivo
-    - valor: número (sempre positivo, representa saída)
+    - data: formato DD/MM/YYYY ou YYYY-MM-DD (obrigatório)
+    - descricao: texto descritivo (obrigatório)
+    - valor: número (sempre positivo, representa saída) (obrigatório)
+    - categoria: texto (opcional)
+    - data_fatura: formato DD/MM/YYYY ou YYYY-MM-DD (opcional, data de fechamento/pagamento)
     """
     if not arquivo.filename.endswith(('.csv', '.xlsx', '.xls')):
         raise HTTPException(
@@ -152,13 +155,25 @@ async def importar_fatura(
             # Pega categoria se existir no arquivo
             categoria = row.get('categoria', None)
             
+            # Pega data_fatura se existir no arquivo
+            data_fatura = None
+            if 'data_fatura' in row and pd.notna(row['data_fatura']):
+                if isinstance(row['data_fatura'], str):
+                    if '/' in row['data_fatura']:
+                        data_fatura = pd.to_datetime(row['data_fatura'], format='%d/%m/%Y').date()
+                    else:
+                        data_fatura = pd.to_datetime(row['data_fatura']).date()
+                else:
+                    data_fatura = pd.to_datetime(row['data_fatura']).date()
+            
             transacao = Transacao(
                 data=data,
                 descricao=str(row['descricao']),
                 valor=valor,
                 tipo="saida",  # Fatura sempre é saída
                 categoria=categoria,
-                origem="fatura_cartao"
+                origem="fatura_cartao",
+                data_fatura=data_fatura
             )
             
             session.add(transacao)

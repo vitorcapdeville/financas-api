@@ -1,12 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select
+from sqlmodel import Session, select, or_
 from typing import List, Optional
 from datetime import date, datetime
 
 from app.database import get_session
 from app.models import Transacao, TransacaoCreate, TransacaoUpdate, TransacaoRead
+from app.models_config import Configuracao
 
 router = APIRouter(prefix="/transacoes", tags=["Transações"])
+
+
+def obter_criterio_data(session: Session) -> str:
+    """Obtém o critério de data configurado (data_transacao ou data_fatura)"""
+    query = select(Configuracao).where(Configuracao.chave == "criterio_data_transacao")
+    config = session.exec(query).first()
+    return config.valor if config else "data_transacao"
 
 
 @router.post("/", response_model=TransacaoRead)
@@ -32,28 +40,58 @@ def listar_transacoes(
     tipo: Optional[str] = None,
     session: Session = Depends(get_session)
 ):
-    """Lista todas as transações com filtros opcionais"""
+    """Lista todas as transações com filtros opcionais
+    
+    O filtro de data pode usar o campo 'data' (data da transação) ou 'data_fatura'
+    (data de pagamento da fatura) dependendo da configuração 'criterio_data_transacao'.
+    """
     query = select(Transacao)
+    
+    # Obtém o critério de data configurado
+    criterio = obter_criterio_data(session)
     
     # Prioriza data_inicio/data_fim se fornecidos, senão usa mes/ano
     if data_inicio and data_fim:
-        query = query.where(
-            Transacao.data >= data_inicio,
-            Transacao.data <= data_fim
-        )
+        if criterio == "data_fatura":
+            # Usa data_fatura quando disponível, senão data da transação
+            query = query.where(
+                or_(
+                    (Transacao.data_fatura >= data_inicio) & (Transacao.data_fatura <= data_fim),
+                    (Transacao.data_fatura.is_(None)) & (Transacao.data >= data_inicio) & (Transacao.data <= data_fim)
+                )
+            )
+        else:
+            query = query.where(
+                Transacao.data >= data_inicio,
+                Transacao.data <= data_fim
+            )
     elif mes and ano:
         data_inicio_calc = date(ano, mes, 1)
         if mes < 12:
             data_fim_calc = date(ano, mes + 1, 1)
         else:
             data_fim_calc = date(ano + 1, 1, 1)
-        query = query.where(
-            Transacao.data >= data_inicio_calc,
-            Transacao.data < data_fim_calc
-        )
+        
+        if criterio == "data_fatura":
+            # Usa data_fatura quando disponível, senão data da transação
+            query = query.where(
+                or_(
+                    (Transacao.data_fatura >= data_inicio_calc) & (Transacao.data_fatura < data_fim_calc),
+                    (Transacao.data_fatura.is_(None)) & (Transacao.data >= data_inicio_calc) & (Transacao.data < data_fim_calc)
+                )
+            )
+        else:
+            query = query.where(
+                Transacao.data >= data_inicio_calc,
+                Transacao.data < data_fim_calc
+            )
     
     if categoria:
-        query = query.where(Transacao.categoria == categoria)
+        # Se categoria for 'null', busca transações sem categoria
+        if categoria == 'null':
+            query = query.where(Transacao.categoria.is_(None))
+        else:
+            query = query.where(Transacao.categoria == categoria)
     
     if tipo:
         query = query.where(Transacao.tipo == tipo)
@@ -80,7 +118,14 @@ def resumo_mensal(
     data_fim: Optional[date] = None,
     session: Session = Depends(get_session)
 ):
-    """Retorna resumo mensal de entradas e saídas por categoria"""
+    """Retorna resumo mensal de entradas e saídas por categoria
+    
+    O filtro de data pode usar o campo 'data' (data da transação) ou 'data_fatura'
+    (data de pagamento da fatura) dependendo da configuração 'criterio_data_transacao'.
+    """
+    # Obtém o critério de data configurado
+    criterio = obter_criterio_data(session)
+    
     # Prioriza data_inicio/data_fim se fornecidos, senão usa mes/ano
     if data_inicio and data_fim:
         periodo_inicio = data_inicio
@@ -94,10 +139,20 @@ def resumo_mensal(
     else:
         raise HTTPException(status_code=400, detail="Forneça mes/ano ou data_inicio/data_fim")
     
-    query = select(Transacao).where(
-        Transacao.data >= periodo_inicio,
-        Transacao.data <= periodo_fim
-    )
+    # Aplica o filtro de data baseado no critério configurado
+    if criterio == "data_fatura":
+        # Usa data_fatura quando disponível, senão data da transação
+        query = select(Transacao).where(
+            or_(
+                (Transacao.data_fatura >= periodo_inicio) & (Transacao.data_fatura <= periodo_fim),
+                (Transacao.data_fatura.is_(None)) & (Transacao.data >= periodo_inicio) & (Transacao.data <= periodo_fim)
+            )
+        )
+    else:
+        query = select(Transacao).where(
+            Transacao.data >= periodo_inicio,
+            Transacao.data <= periodo_fim
+        )
     
     transacoes = session.exec(query).all()
     

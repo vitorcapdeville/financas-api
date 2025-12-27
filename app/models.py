@@ -19,6 +19,7 @@ class Transacao(SQLModel, table=True):
     categoria: Optional[str] = Field(default=None, description="Categoria da transação")
     origem: str = Field(default="manual", description="Origem: manual, extrato_bancario, fatura_cartao")
     observacoes: Optional[str] = Field(default=None, description="Observações adicionais")
+    data_fatura: Optional[date] = Field(default=None, description="Data de fechamento/pagamento da fatura (para transações de cartão)")
     criado_em: datetime = Field(default_factory=datetime.now)
     atualizado_em: datetime = Field(default_factory=datetime.now)
 
@@ -32,6 +33,7 @@ class TransacaoCreate(SQLModel):
     categoria: Optional[str] = None
     origem: str = "manual"
     observacoes: Optional[str] = None
+    data_fatura: Optional[date] = None
 
 
 class TransacaoUpdate(SQLModel):
@@ -42,6 +44,7 @@ class TransacaoUpdate(SQLModel):
     tipo: Optional[TipoTransacao] = None
     categoria: Optional[str] = None
     observacoes: Optional[str] = None
+    data_fatura: Optional[date] = None
 
 
 class TransacaoRead(SQLModel):
@@ -54,5 +57,6 @@ class TransacaoRead(SQLModel):
     categoria: Optional[str]
     origem: str
     observacoes: Optional[str]
+    data_fatura: Optional[date]
     criado_em: datetime
     atualizado_em: datetime

@@ -507,6 +507,16 @@ uv run uvicorn app.main:app --reload
 
 **IMPORTANTE**: Todos os commits devem seguir o padrão **Conventional Commits** (https://www.conventionalcommits.org/en/v1.0.0/)
 
+**CRÍTICO**: Use sempre o **MCP GitKraken** para fazer commits. NUNCA use comandos git diretamente no terminal.
+
+### Como Fazer Commits
+
+Use as ferramentas MCP do GitKraken:
+```
+1. mcp_gitkraken_git_add_or_commit - para adicionar arquivos e fazer commit
+2. mcp_gitkraken_git_push - para enviar para o repositório remoto
+```
+
 ### Formato
 ```
 <tipo>[escopo opcional]: <descrição>
