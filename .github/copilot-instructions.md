@@ -36,7 +36,7 @@ app/
 
 - **Multi-tenant data**: Sistema de `Configuracao` para armazenar preferências do usuário (ex: `diaInicioPeriodo`)
 - **Dual filtering**: Endpoints suportam `mes/ano` OU `data_inicio/data_fim` - sempre priorizar período customizado quando ambos fornecidos
-- **Database initialization**: Ao criar novo modelo, SEMPRE importá-lo em `database.py` no `create_db_and_tables()` para que seja criado
+- **Database migrations**: Usamos Alembic para gerenciar migrações - NUNCA crie tabelas manualmente ou use `create_all()`
 - **CORS setup**: Frontend em `http://localhost:3000` já configurado em `main.py`
 
 ## Modelos de Dados
@@ -133,7 +133,261 @@ A API permite requisições do frontend Next.js em `http://localhost:3000`. Ajus
 - Use sempre `session.commit()` após modificações
 - Use `session.refresh()` após criar/atualizar
 - Sempre feche sessões corretamente (handled by `get_session`)
-- As tabelas são criadas automaticamente no startup
+- **NUNCA use `create_all()` ou `create_db_and_tables()`** - usamos Alembic para migrações
+
+## Migrações de Banco de Dados (Alembic)
+
+**CRÍTICO**: Este projeto usa **Alembic** para gerenciar migrações do banco de dados. Qualquer mudança que afete o schema do banco **DEVE** ser feita através de migrações.
+
+### Por que Alembic?
+
+- Mantém histórico completo de mudanças no schema
+- Permite rollback de alterações
+- Evita perda de dados em produção
+- Permite controle de versão do schema
+- Facilita deploy em múltiplos ambientes
+
+### Estrutura de Arquivos
+
+```
+alembic/
+├── versions/          # Scripts de migração (versionados)
+├── env.py            # Configuração do Alembic (conecta com SQLModel)
+├── script.py.mako    # Template para novos scripts
+└── README           
+alembic.ini           # Configurações do Alembic
+```
+
+### Workflow de Migrações
+
+#### 1. Criar um Novo Modelo
+
+Ao adicionar um novo modelo SQLModel:
+
+```python
+# app/models_novo.py
+from sqlmodel import SQLModel, Field
+from datetime import datetime
+from typing import Optional
+
+class NovoModelo(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    nome: str = Field(index=True)
+    valor: float
+    criado_em: datetime = Field(default_factory=datetime.now)
+```
+
+**IMPORTANTE**: Importe o modelo em `alembic/env.py` para que seja detectado:
+
+```python
+# alembic/env.py
+from app.models import Transacao  # noqa: F401
+from app.models_config import Configuracao  # noqa: F401
+from app.models_novo import NovoModelo  # noqa: F401  <-- ADICIONE AQUI
+```
+
+#### 2. Gerar Migração Automática
+
+```bash
+# Gera uma nova migração detectando mudanças nos modelos
+uv run alembic revision --autogenerate -m "descrição_da_mudança"
+
+# Exemplos:
+uv run alembic revision --autogenerate -m "adiciona tabela de orçamentos"
+uv run alembic revision --autogenerate -m "adiciona coluna nota_fiscal em transacao"
+uv run alembic revision --autogenerate -m "adiciona índice em categoria"
+```
+
+O Alembic irá:
+- Comparar os modelos SQLModel com o estado atual do banco
+- Detectar diferenças (novas tabelas, colunas, índices, etc)
+- Gerar um script de migração em `alembic/versions/`
+- Incluir timestamp no nome do arquivo para ordenação
+
+#### 3. Revisar o Script Gerado
+
+**SEMPRE revise o script gerado antes de aplicar!**
+
+```python
+# alembic/versions/20251227_1045-abc123_adiciona_orcamentos.py
+def upgrade() -> None:
+    # Operações para aplicar a migração
+    op.create_table(
+        'orcamento',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('categoria', sa.String(), nullable=False),
+        sa.Column('valor_maximo', sa.Float(), nullable=False),
+        sa.PrimaryKeyConstraint('id')
+    )
+
+def downgrade() -> None:
+    # Operações para reverter a migração
+    op.drop_table('orcamento')
+```
+
+**Verifique**:
+- Operações de upgrade estão corretas
+- Operações de downgrade revertem corretamente
+- Não há perda de dados
+- Valores default estão corretos
+- Constraints estão adequados
+
+#### 4. Aplicar a Migração
+
+```bash
+# Aplica todas as migrações pendentes
+uv run alembic upgrade head
+
+# Aplicar uma migração específica
+uv run alembic upgrade +1  # Próxima migração
+uv run alembic upgrade abc123  # Migração específica por revision
+```
+
+#### 5. Reverter Migração (se necessário)
+
+```bash
+# Voltar uma migração
+uv run alembic downgrade -1
+
+# Voltar para uma versão específica
+uv run alembic downgrade abc123
+
+# Voltar todas as migrações
+uv run alembic downgrade base
+```
+
+### Comandos Úteis
+
+```bash
+# Ver histórico de migrações
+uv run alembic history
+
+# Ver status atual
+uv run alembic current
+
+# Ver SQL que será executado (sem aplicar)
+uv run alembic upgrade head --sql
+
+# Criar migração vazia (para mudanças manuais)
+uv run alembic revision -m "adiciona dados iniciais"
+```
+
+### Casos Especiais
+
+#### Modificar Dados Durante Migração
+
+Para inserir/atualizar dados durante uma migração:
+
+```python
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy import table, column
+
+def upgrade() -> None:
+    # Criar nova tabela
+    op.create_table(
+        'categoria',
+        sa.Column('id', sa.Integer(), primary_key=True),
+        sa.Column('nome', sa.String(), nullable=False),
+    )
+    
+    # Inserir dados iniciais
+    categorias_table = table('categoria',
+        column('nome', sa.String())
+    )
+    
+    op.bulk_insert(categorias_table, [
+        {'nome': 'Alimentação'},
+        {'nome': 'Transporte'},
+        {'nome': 'Moradia'},
+    ])
+```
+
+#### Adicionar Coluna com Valor Default
+
+```python
+def upgrade() -> None:
+    # Adiciona coluna com valor padrão para registros existentes
+    op.add_column('transacao', 
+        sa.Column('status', sa.String(), nullable=False, server_default='ativo')
+    )
+    
+    # Remove server_default após preencher registros existentes
+    op.alter_column('transacao', 'status', server_default=None)
+```
+
+#### Renomear Coluna (preservando dados)
+
+```python
+def upgrade() -> None:
+    op.alter_column('transacao', 'descricao', new_column_name='nome')
+
+def downgrade() -> None:
+    op.alter_column('transacao', 'nome', new_column_name='descricao')
+```
+
+### Regras Importantes
+
+1. **NUNCA edite migrações já aplicadas** - crie uma nova migração
+2. **SEMPRE importe novos modelos em `alembic/env.py`**
+3. **SEMPRE revise o script antes de aplicar**
+4. **Teste migrações em desenvolvimento antes de produção**
+5. **Commit migrações junto com mudanças de código**
+6. **Nunca delete scripts de migração do histórico**
+7. **Use mensagens descritivas** nas migrações
+
+### Workflow Completo: Adicionar Nova Funcionalidade
+
+```bash
+# 1. Criar/modificar modelo SQLModel
+# 2. Importar em alembic/env.py
+# 3. Gerar migração
+uv run alembic revision --autogenerate -m "adiciona modelo X"
+
+# 4. Revisar script gerado em alembic/versions/
+# 5. Aplicar migração
+uv run alembic upgrade head
+
+# 6. Testar aplicação
+uv run uvicorn app.main:app --reload
+
+# 7. Commit código + migração
+git add app/models_novo.py alembic/env.py alembic/versions/
+git commit -m "feat: adiciona modelo X com migração"
+```
+
+### Troubleshooting
+
+**Erro: "Target database is not up to date"**
+```bash
+# Aplique as migrações pendentes
+uv run alembic upgrade head
+```
+
+**Erro: "Can't locate revision identified by 'abc123'"**
+```bash
+# Verifique o histórico
+uv run alembic history
+# Certifique-se de que o arquivo de migração existe
+```
+
+**Migração não detecta mudanças**
+```bash
+# 1. Verifique se o modelo está importado em alembic/env.py
+# 2. Verifique se SQLModel.metadata está configurado
+# 3. Force a criação manual:
+uv run alembic revision -m "descrição"
+# Edite manualmente o script gerado
+```
+
+**Banco em estado inconsistente**
+```bash
+# Em DESENVOLVIMENTO, você pode resetar:
+uv run alembic downgrade base  # Remove todas as migrações
+uv run alembic upgrade head    # Reaplica tudo
+
+# Em PRODUÇÃO, NUNCA faça isso - crie migrações de correção
+```
 
 ## Testes
 
@@ -181,7 +435,12 @@ O arquivo `.env` deve conter:
 DATABASE_URL=postgresql://financas_user:financas_pass@localhost:5432/financas_db
 ```
 
-**PostgreSQL deve estar rodando** antes de iniciar a aplicação. As tabelas são criadas automaticamente no primeiro startup via `create_db_and_tables()`.
+**PostgreSQL deve estar rodando** antes de iniciar a aplicação.
+
+**Aplicar Migrações**: Na primeira execução ou após mudanças no schema:
+```bash
+uv run alembic upgrade head
+```
 
 ### Adicionar Nova Dependência
 ```bash

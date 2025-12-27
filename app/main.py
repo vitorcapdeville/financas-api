@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import create_db_and_tables
 from app.routers import transacoes, importacao, configuracoes
 
 app = FastAPI(
@@ -23,12 +22,6 @@ app.add_middleware(
 app.include_router(transacoes.router)
 app.include_router(importacao.router)
 app.include_router(configuracoes.router)
-
-
-@app.on_event("startup")
-def on_startup():
-    """Cria as tabelas do banco de dados ao iniciar a aplicação"""
-    create_db_and_tables()
 
 
 @app.get("/")
