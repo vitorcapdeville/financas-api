@@ -75,6 +75,7 @@ async def importar_extrato(
                 data=data,
                 descricao=str(row['descricao']),
                 valor=valor_abs,
+                valor_original=valor_abs,  # Define valor original na importação
                 tipo=tipo,
                 categoria=categoria,
                 origem="extrato_bancario"
@@ -170,6 +171,7 @@ async def importar_fatura(
                 data=data,
                 descricao=str(row['descricao']),
                 valor=valor,
+                valor_original=valor,  # Define valor original na importação
                 tipo="saida",  # Fatura sempre é saída
                 categoria=categoria,
                 origem="fatura_cartao",

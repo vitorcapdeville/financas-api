@@ -24,6 +24,9 @@ def criar_transacao(
 ):
     """Cria uma nova transação"""
     db_transacao = Transacao.model_validate(transacao)
+    # Define valor_original como o valor inicial
+    if db_transacao.valor_original is None:
+        db_transacao.valor_original = db_transacao.valor
     session.add(db_transacao)
     session.commit()
     session.refresh(db_transacao)
@@ -204,6 +207,10 @@ def atualizar_transacao(
     if not db_transacao:
         raise HTTPException(status_code=404, detail="Transação não encontrada")
     
+    # Se valor_original ainda não foi definido, define antes de atualizar
+    if db_transacao.valor_original is None:
+        db_transacao.valor_original = db_transacao.valor
+    
     update_data = transacao_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_transacao, key, value)
@@ -215,5 +222,24 @@ def atualizar_transacao(
     return db_transacao
 
 
-
-
+@router.post("/{transacao_id}/restaurar-valor", response_model=TransacaoRead)
+def restaurar_valor_original(
+    transacao_id: int,
+    session: Session = Depends(get_session)
+):
+    """Restaura o valor original de uma transação"""
+    db_transacao = session.get(Transacao, transacao_id)
+    if not db_transacao:
+        raise HTTPException(status_code=404, detail="Transação não encontrada")
+    
+    if db_transacao.valor_original is None:
+        raise HTTPException(status_code=400, detail="Transação não possui valor original salvo")
+    
+    # Restaura o valor original
+    db_transacao.valor = db_transacao.valor_original
+    db_transacao.atualizado_em = datetime.now()
+    
+    session.add(db_transacao)
+    session.commit()
+    session.refresh(db_transacao)
+    return db_transacao

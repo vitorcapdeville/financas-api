@@ -15,6 +15,7 @@ class Transacao(SQLModel, table=True):
     data: date = Field(description="Data da transação")
     descricao: str = Field(description="Descrição da transação")
     valor: float = Field(description="Valor da transação")
+    valor_original: Optional[float] = Field(default=None, description="Valor original da transação antes de qualquer edição")
     tipo: TipoTransacao = Field(description="Tipo de transação: entrada ou saída")
     categoria: Optional[str] = Field(default=None, description="Categoria da transação")
     origem: str = Field(default="manual", description="Origem: manual, extrato_bancario, fatura_cartao")
@@ -53,6 +54,7 @@ class TransacaoRead(SQLModel):
     data: date
     descricao: str
     valor: float
+    valor_original: Optional[float]
     tipo: TipoTransacao
     categoria: Optional[str]
     origem: str
