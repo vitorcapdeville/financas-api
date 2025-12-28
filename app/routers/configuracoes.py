@@ -29,6 +29,29 @@ def salvar_configuracao(
     session: Session = Depends(get_session)
 ):
     """Cria ou atualiza uma configuração"""
+    # Validações específicas por tipo de configuração
+    if configuracao.chave == "diaInicioPeriodo":
+        try:
+            dia = int(configuracao.valor)
+            if not 1 <= dia <= 28:
+                raise HTTPException(
+                    status_code=400,
+                    detail="diaInicioPeriodo deve estar entre 1 e 28"
+                )
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="diaInicioPeriodo deve ser um número válido"
+            )
+    
+    elif configuracao.chave == "criterio_data_transacao":
+        valores_validos = ["data_transacao", "data_fatura"]
+        if configuracao.valor not in valores_validos:
+            raise HTTPException(
+                status_code=400,
+                detail=f"criterio_data_transacao deve ser um dos valores: {', '.join(valores_validos)}"
+            )
+    
     query = select(Configuracao).where(Configuracao.chave == configuracao.chave)
     db_config = session.exec(query).first()
     
