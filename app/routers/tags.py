@@ -2,12 +2,12 @@
 Router para gerenciamento de tags
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session, select, delete
 from datetime import datetime
 from typing import List
 
 from app.database import get_session
-from app.models_tags import Tag, TagCreate, TagUpdate, TagRead
+from app.models_tags import Tag, TagCreate, TagUpdate, TagRead, TransacaoTag
 
 
 router = APIRouter(prefix="/tags", tags=["Tags"])
@@ -91,6 +91,10 @@ def deletar_tag(tag_id: int, session: Session = Depends(get_session)):
     if not tag:
         raise HTTPException(status_code=404, detail="Tag não encontrada")
     
+    # Remove explicitamente todas as associações com transações
+    session.exec(delete(TransacaoTag).where(TransacaoTag.tag_id == tag_id))
+    
+    # Deleta a tag
     session.delete(tag)
     session.commit()
     return None

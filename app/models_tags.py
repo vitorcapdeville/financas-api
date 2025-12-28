@@ -18,8 +18,11 @@ class Tag(SQLModel, table=True):
     criado_em: datetime = Field(default_factory=datetime.now, description="Data de criação")
     atualizado_em: datetime = Field(default_factory=datetime.now, description="Data da última atualização")
 
-    # Relacionamento
-    transacoes: list["TransacaoTag"] = Relationship(back_populates="tag")
+    # Relacionamento com cascade delete
+    transacoes: list["TransacaoTag"] = Relationship(
+        back_populates="tag",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 
 class TransacaoTag(SQLModel, table=True):
