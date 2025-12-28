@@ -2,14 +2,18 @@
 Modelos de tags e relacionamento com transações
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING, List
 from sqlmodel import SQLModel, Field, Relationship
+
+if TYPE_CHECKING:
+    from app.models_regra import Regra, RegraTag
+    from app.models import Transacao
 
 
 class Tag(SQLModel, table=True):
     """
     Modelo de Tag para categorização flexível de transações.
-    Uma tag pode ser associada a múltiplas transações.
+    Uma tag pode ser associada a múltiplas transações e regras.
     """
     id: Optional[int] = Field(default=None, primary_key=True)
     nome: str = Field(index=True, unique=True, description="Nome único da tag")
@@ -18,8 +22,8 @@ class Tag(SQLModel, table=True):
     criado_em: datetime = Field(default_factory=datetime.now, description="Data de criação")
     atualizado_em: datetime = Field(default_factory=datetime.now, description="Data da última atualização")
 
-    # Relacionamento com cascade delete
-    transacoes: list["TransacaoTag"] = Relationship(
+    # Relacionamento com transações (cascade delete)
+    transacoes: List["TransacaoTag"] = Relationship(
         back_populates="tag",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )

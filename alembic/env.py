@@ -34,6 +34,7 @@ from sqlmodel import SQLModel
 from app.models import Transacao  # noqa: F401
 from app.models_config import Configuracao  # noqa: F401
 from app.models_tags import Tag, TransacaoTag  # noqa: F401
+from app.models_regra import Regra, RegraTag  # noqa: F401
 
 target_metadata = SQLModel.metadata
 

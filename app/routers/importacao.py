@@ -6,6 +6,7 @@ from io import BytesIO
 
 from app.database import get_session
 from app.models import Transacao, TransacaoRead
+from app.services.regras import aplicar_todas_regras_ativas
 
 router = APIRouter(prefix="/importacao", tags=["Importação"])
 
@@ -86,6 +87,15 @@ async def importar_extrato(
         
         session.commit()
         
+        # Aplicar regras ativas em cada transação importada de extrato
+        for t in transacoes_criadas:
+            session.refresh(t)
+            aplicar_todas_regras_ativas(t, session)
+        
+        # Commit final após aplicar regras
+        session.commit()
+        
+        # Refresh final para obter estado atualizado
         for t in transacoes_criadas:
             session.refresh(t)
         
@@ -183,6 +193,15 @@ async def importar_fatura(
         
         session.commit()
         
+        # Aplicar regras ativas em cada transação importada de fatura
+        for t in transacoes_criadas:
+            session.refresh(t)
+            aplicar_todas_regras_ativas(t, session)
+        
+        # Commit final após aplicar regras
+        session.commit()
+        
+        # Refresh final para obter estado atualizado
         for t in transacoes_criadas:
             session.refresh(t)
         
