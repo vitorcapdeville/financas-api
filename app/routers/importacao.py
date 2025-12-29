@@ -1,14 +1,55 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-from sqlmodel import Session
+from sqlmodel import Session, select
 from typing import List
 import pandas as pd
 from io import BytesIO
 
 from app.database import get_session
 from app.models import Transacao, TransacaoRead
+from app.models_tags import Tag, TransacaoTag
 from app.services.regras import aplicar_todas_regras_ativas
 
 router = APIRouter(prefix="/importacao", tags=["Importação"])
+
+
+def _garantir_tag_rotina(session: Session) -> Tag:
+    """
+    Garante que a tag "Rotina" existe, criando-a se necessário.
+    Retorna a tag "Rotina".
+    """
+    tag_rotina = session.exec(select(Tag).where(Tag.nome == "Rotina")).first()
+    
+    if not tag_rotina:
+        tag_rotina = Tag(
+            nome="Rotina",
+            descricao="Tag adicionada automaticamente às transações importadas",
+            cor="#4B5563"  # Cor cinza neutra
+        )
+        session.add(tag_rotina)
+        session.commit()
+        session.refresh(tag_rotina)
+    
+    return tag_rotina
+
+
+def _associar_tag_rotina(transacao: Transacao, tag_rotina: Tag, session: Session):
+    """
+    Associa a tag "Rotina" a uma transação.
+    """
+    # Verifica se a transação já tem a tag para evitar duplicatas
+    ja_tem_tag = session.exec(
+        select(TransacaoTag).where(
+            (TransacaoTag.transacao_id == transacao.id) &
+            (TransacaoTag.tag_id == tag_rotina.id)
+        )
+    ).first()
+    
+    if not ja_tem_tag:
+        transacao_tag = TransacaoTag(
+            transacao_id=transacao.id,
+            tag_id=tag_rotina.id
+        )
+        session.add(transacao_tag)
 
 
 @router.post("/extrato", response_model=List[TransacaoRead])
@@ -84,6 +125,15 @@ async def importar_extrato(
             
             session.add(transacao)
             transacoes_criadas.append(transacao)
+        
+        session.commit()
+        
+        # Garantir que a tag "Rotina" existe
+        tag_rotina = _garantir_tag_rotina(session)
+        
+        # Associar tag "Rotina" a todas as transações importadas
+        for t in transacoes_criadas:
+            _associar_tag_rotina(t, tag_rotina, session)
         
         session.commit()
         
@@ -190,6 +240,15 @@ async def importar_fatura(
             
             session.add(transacao)
             transacoes_criadas.append(transacao)
+        
+        session.commit()
+        
+        # Garantir que a tag "Rotina" existe
+        tag_rotina = _garantir_tag_rotina(session)
+        
+        # Associar tag "Rotina" a todas as transações importadas
+        for t in transacoes_criadas:
+            _associar_tag_rotina(t, tag_rotina, session)
         
         session.commit()
         
