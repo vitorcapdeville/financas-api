@@ -54,4 +54,8 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_regra_prioridade'), table_name='regra')
     op.drop_index(op.f('ix_regra_nome'), table_name='regra')
     op.drop_table('regra')
+    
+    # Remover os tipos ENUM criados
+    op.execute("DROP TYPE IF EXISTS tipoacao")
+    op.execute("DROP TYPE IF EXISTS criteriotipo")
     # ### end Alembic commands ###
