@@ -323,7 +323,7 @@ class TestValorOriginal:
         assert response.status_code == 200
         data = response.json()
         assert data["valor"] == 100.0
-        assert data["valor_original"] is None
+        assert data["valor_original"] == 100.0  # Mantém histórico
 
 
 class TestTagsCaseInsensitive:
