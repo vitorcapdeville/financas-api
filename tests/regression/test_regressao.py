@@ -190,12 +190,12 @@ class TestCriterioDataTransacao:
         
         response = client.post(
             "/importacao/fatura",
-            files={"file": ("fatura.csv", csv_file, "text/csv")}
+            files={"arquivo": ("fatura.csv", csv_file, "text/csv")}
         )
         
         assert response.status_code == 200
-        data = response.json()
-        assert data["total_importado"] == 1
+        transacoes = response.json()
+        assert len(transacoes) == 1
 
         # Verificar que ambas as datas foram salvas
         transacao = session.exec(select(Transacao)).first()
@@ -423,7 +423,7 @@ class TestImportacaoTagRotina:
         
         response = client.post(
             "/importacao/extrato",
-            files={"file": ("extrato.csv", csv_file, "text/csv")}
+            files={"arquivo": ("extrato.csv", csv_file, "text/csv")}
         )
         
         assert response.status_code == 200
@@ -443,7 +443,7 @@ class TestImportacaoTagRotina:
         
         response = client.post(
             "/importacao/fatura",
-            files={"file": ("fatura.csv", csv_file, "text/csv")}
+            files={"arquivo": ("fatura.csv", csv_file, "text/csv")}
         )
         
         assert response.status_code == 200
