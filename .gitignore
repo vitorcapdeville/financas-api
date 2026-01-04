@@ -39,3 +39,9 @@ wheels/
 
 # Logs
 *.log
+
+# Tests
+htmlcov/
+.coverage
+.pytest_cache/
+.tox/
