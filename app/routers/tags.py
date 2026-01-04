@@ -3,6 +3,7 @@ Router para gerenciamento de tags
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, delete
+from sqlalchemy import func
 from datetime import datetime
 from typing import List
 
@@ -38,10 +39,15 @@ def criar_tag(tag_data: TagCreate, session: Session = Depends(get_session)):
     """
     Cria uma nova tag
     """
-    # Verifica se já existe uma tag com o mesmo nome
-    existing = session.exec(select(Tag).where(Tag.nome == tag_data.nome)).first()
+    # Verifica se já existe uma tag com o mesmo nome (case-insensitive)
+    existing = session.exec(
+        select(Tag).where(func.lower(Tag.nome) == tag_data.nome.lower())
+    ).first()
     if existing:
-        raise HTTPException(status_code=400, detail=f"Tag '{tag_data.nome}' já existe")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tag com nome '{tag_data.nome}' já existe (case-insensitive)"
+        )
     
     tag = Tag(**tag_data.model_dump())
     session.add(tag)
@@ -63,11 +69,19 @@ def atualizar_tag(
     if not tag:
         raise HTTPException(status_code=404, detail="Tag não encontrada")
     
-    # Se estiver tentando alterar o nome, verifica se não conflita com outra tag
+    # Se estiver tentando alterar o nome, verifica se não conflita com outra tag (case-insensitive)
     if tag_data.nome and tag_data.nome != tag.nome:
-        existing = session.exec(select(Tag).where(Tag.nome == tag_data.nome)).first()
+        existing = session.exec(
+            select(Tag).where(
+                func.lower(Tag.nome) == tag_data.nome.lower(),
+                Tag.id != tag_id
+            )
+        ).first()
         if existing:
-            raise HTTPException(status_code=400, detail=f"Tag '{tag_data.nome}' já existe")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tag com nome '{tag_data.nome}' já existe (case-insensitive)"
+            )
     
     # Atualiza apenas os campos fornecidos
     update_data = tag_data.model_dump(exclude_unset=True)
