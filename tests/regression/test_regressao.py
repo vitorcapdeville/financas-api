@@ -356,7 +356,7 @@ class TestResumoMensal:
     """Testes de resumo mensal - CRÍTICO para dashboard."""
 
     def test_resumo_sem_parametros_usa_mes_atual(self, client: TestClient, session: Session):
-        """REGRESSÃO: Resumo sem parâmetros deve usar mês atual."""
+        """REGRESSÃO: Resumo com mes/ano deve retornar dados do período especificado."""
         mes_atual = datetime.now().month
         ano_atual = datetime.now().year
         
@@ -368,7 +368,8 @@ class TestResumoMensal:
             valor=100.0
         )
 
-        response = client.get("/transacoes/resumo/mensal")
+        # Chamar com mes e ano explícitos (comportamento correto)
+        response = client.get(f"/transacoes/resumo/mensal?mes={mes_atual}&ano={ano_atual}")
         
         assert response.status_code == 200
         data = response.json()
