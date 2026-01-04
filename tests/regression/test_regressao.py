@@ -16,6 +16,7 @@ import pytest
 from datetime import datetime, date
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
+from sqlalchemy import func
 
 from tests.factories import TransacaoFactory, TagFactory, RegraFactory, ConfiguracaoFactory
 from app.models import Transacao
@@ -414,7 +415,7 @@ class TestImportacaoTagRotina:
     """Testes de tag de rotina na importação - CRÍTICO para rastreamento."""
 
     def test_importar_extrato_cria_tag_rotina(self, client: TestClient, session: Session):
-        """REGRESSÃO: Importar extrato deve criar tag "rotina_YYYYMM"."""
+        """REGRESSÃO: Importar extrato deve criar tag 'rotina'."""
         import io
         
         csv_content = "data,descricao,valor,categoria\n"
@@ -429,12 +430,12 @@ class TestImportacaoTagRotina:
         
         assert response.status_code == 200
 
-        # Verificar que tag foi criada
-        tags = session.exec(select(Tag).where(Tag.nome.like("rotina_%"))).all()
-        assert len(tags) >= 1
+        # Verificar que tag 'rotina' foi criada (case-insensitive)
+        tag_rotina = session.exec(select(Tag).where(func.lower(Tag.nome) == "rotina")).first()
+        assert tag_rotina is not None
 
     def test_importar_fatura_cria_tag_rotina(self, client: TestClient, session: Session):
-        """REGRESSÃO: Importar fatura deve criar tag "rotina_YYYYMM"."""
+        """REGRESSÃO: Importar fatura deve criar tag 'rotina'."""
         import io
         
         csv_content = "data,descricao,valor,categoria\n"
@@ -449,9 +450,9 @@ class TestImportacaoTagRotina:
         
         assert response.status_code == 200
 
-        # Verificar que tag foi criada
-        tags = session.exec(select(Tag).where(Tag.nome.like("rotina_%"))).all()
-        assert len(tags) >= 1
+        # Verificar que tag 'rotina' foi criada (case-insensitive)
+        tag_rotina = session.exec(select(Tag).where(func.lower(Tag.nome) == "rotina")).first()
+        assert tag_rotina is not None
 
 
 class TestDiaInicioPeriodo:
