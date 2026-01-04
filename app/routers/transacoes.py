@@ -387,6 +387,29 @@ def remover_tag_transacao(
     return None
 
 
+@router.delete("/{transacao_id}", status_code=204)
+def deletar_transacao(
+    transacao_id: int,
+    session: Session = Depends(get_session)
+):
+    """
+    Deleta uma transação.
+    
+    CASCADE DELETE: Remove automaticamente todas as associações com tags (TransacaoTag),
+    mas mantém as tags originais.
+    """
+    # Verifica se transação existe
+    transacao = session.get(Transacao, transacao_id)
+    if not transacao:
+        raise HTTPException(status_code=404, detail="Transação não encontrada")
+    
+    # Deleta a transação (CASCADE DELETE cuida das associações)
+    session.delete(transacao)
+    session.commit()
+    
+    return None
+
+
 @router.get("/{transacao_id}/tags", response_model=List[TagRead])
 def listar_tags_transacao(
     transacao_id: int,

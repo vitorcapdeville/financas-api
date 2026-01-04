@@ -28,8 +28,11 @@ class Transacao(SQLModel, table=True):
     criado_em: datetime = Field(default_factory=datetime.now)
     atualizado_em: datetime = Field(default_factory=datetime.now)
 
-    # Relacionamento com tags
-    tags: list["TransacaoTag"] = Relationship(back_populates="transacao")
+    # Relacionamento com tags (CASCADE DELETE)
+    tags: list["TransacaoTag"] = Relationship(
+        back_populates="transacao",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
     @field_validator('data_fatura')
     @classmethod
