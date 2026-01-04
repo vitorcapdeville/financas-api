@@ -2,69 +2,81 @@
 Fixtures globais para testes.
 
 Este arquivo contém fixtures compartilhadas por todos os testes:
-- Banco de dados em memória (SQLite)
+- Banco de dados PostgreSQL de teste
 - Cliente HTTP de teste
 - Sessão de banco de dados
 - Limpeza automática após cada teste
 """
 
 import os
-from typing import Generator
 from datetime import datetime
+from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine, select
-from sqlmodel.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine, select, text
 
-from app.main import app
 from app.database import get_session
-from app.models import Transacao, TipoTransacao
+from app.main import app
+from app.models import TipoTransacao, Transacao
 from app.models_config import Configuracao
+from app.models_regra import CriterioTipo, Regra, RegraTag, TipoAcao
 from app.models_tags import Tag, TransacaoTag
-from app.models_regra import Regra, RegraTag, TipoAcao, CriterioTipo
+from alembic.config import Config
+from alembic import command
+from app.config import settings
 
 
-# Configurar variáveis de ambiente para testes
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
-
-
-@pytest.fixture(name="engine")
+@pytest.fixture(name="engine", scope="session")
 def engine_fixture():
     """
-    Cria engine SQLite em memória para testes.
-    
-    Usa StaticPool para manter a conexão aberta durante toda a sessão de teste.
+    Cria engine PostgreSQL para testes e aplica migrações Alembic.
+
+    Scope 'session' para reutilizar engine entre testes (performance).
     """
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    SQLModel.metadata.create_all(engine)
-    return engine
+    # Criar engine
+    engine = create_engine(settings.DATABASE_URL, echo=False)
+
+    # Configurar e rodar migrações Alembic
+    alembic_cfg = Config("alembic.ini")
+    
+    command.downgrade(alembic_cfg, "base")
+    command.upgrade(alembic_cfg, "head")
+
+    yield engine
+
+    # Limpar todas as tabelas ao final da sessão
+    command.downgrade(alembic_cfg, "base")
+    engine.dispose()
 
 
-@pytest.fixture(name="session")
+@pytest.fixture(name="session", autouse=True)
 def session_fixture(engine) -> Generator[Session, None, None]:
     """
     Cria sessão de banco de dados para cada teste.
-    
+
     Cada teste recebe uma sessão limpa e isolada.
-    Após o teste, faz rollback para garantir isolamento.
+    Usa transação que é revertida após o teste (rollback).
     """
-    with Session(engine) as session:
-        yield session
-        session.rollback()
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = Session(bind=connection)
+
+    yield session
+
+    session.close()
+    transaction.rollback()
+    connection.close()
 
 
 @pytest.fixture(name="client")
 def client_fixture(session: Session) -> Generator[TestClient, None, None]:
     """
     Cria cliente HTTP de teste.
-    
+
     Override da dependency get_session para usar sessão de teste.
     """
+
     def get_session_override():
         return session
 
@@ -78,7 +90,7 @@ def client_fixture(session: Session) -> Generator[TestClient, None, None]:
 def transacao_basica_fixture(session: Session) -> Transacao:
     """
     Cria uma transação básica para testes.
-    
+
     Útil para testes que precisam de uma transação existente.
     """
     transacao = Transacao(
@@ -147,31 +159,17 @@ def configuracao_basica_fixture(session: Session) -> Configuracao:
 
 
 @pytest.fixture(autouse=True)
-def reset_database(session: Session):
+def reset_database():
     """
-    Limpa o banco de dados antes de cada teste.
-    
-    autouse=True faz com que esta fixture seja executada automaticamente.
+    Reseta completamente o banco de dados antes de cada teste.
+
+    Usa alembic downgrade base + upgrade head para garantir
+    schema limpo sem problemas de transação.
     """
-    # Deletar dados em ordem para respeitar FKs
-    session.exec(select(RegraTag)).all()
-    for item in session.exec(select(RegraTag)).all():
-        session.delete(item)
-    
-    session.exec(select(TransacaoTag)).all()
-    for item in session.exec(select(TransacaoTag)).all():
-        session.delete(item)
-    
-    for transacao in session.exec(select(Transacao)).all():
-        session.delete(transacao)
-    
-    for tag in session.exec(select(Tag)).all():
-        session.delete(tag)
-    
-    for regra in session.exec(select(Regra)).all():
-        session.delete(regra)
-    
-    for config in session.exec(select(Configuracao)).all():
-        session.delete(config)
-    
-    session.commit()
+    alembic_cfg = Config("alembic.ini")
+    # Desfaz todas as migrações (drop all tables)
+    command.downgrade(alembic_cfg, "base")
+    # Reaplica todas as migrações (recreate all tables)
+    command.upgrade(alembic_cfg, "head")
+
+    yield  # Executa o teste

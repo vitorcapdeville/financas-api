@@ -1,11 +1,13 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://financas_user:financas_pass@localhost:5432/financas_db"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
+    DATABASE_URL: str
     
-    class Config:
-        env_file = ".env"
-
 
 settings = Settings()

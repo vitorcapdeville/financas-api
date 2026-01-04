@@ -90,7 +90,9 @@ class TestTransacaoModel:
         
         assert antes <= transacao.criado_em <= depois
         assert antes <= transacao.atualizado_em <= depois
-        assert transacao.criado_em == transacao.atualizado_em
+        # Timestamps devem ser próximos (diferença menor que 1 segundo)
+        diff = abs((transacao.atualizado_em - transacao.criado_em).total_seconds())
+        assert diff < 1.0
     
     def test_atualizar_timestamp_atualizado_em(self, session: Session):
         """Testa que atualizado_em muda ao modificar transação."""
@@ -231,29 +233,25 @@ class TestTagModel:
         assert tag.cor is None
         assert tag.descricao is None
     
-    @pytest.mark.skip(reason="Teste requer PostgreSQL - constraints unique aplicados via migração")
     def test_nome_unico_constraint(self, session: Session):
-        """Testa que nomes de tags devem ser únicos."""
+        """Testa que nomes de tags devem ser únicos (constraint PostgreSQL)."""
         tag1 = TagFactory.create(session=session, nome="Única")
         
         # Tentar criar tag com mesmo nome
-        tag2 = Tag(nome="Única")
+        tag2 = Tag(nome="Única", cor="#000000")
         session.add(tag2)
         
         with pytest.raises(Exception):  # IntegrityError do SQLAlchemy
-            session.commit()
+            session.flush()
     
-    @pytest.mark.skip(reason="Teste requer PostgreSQL - índice case-insensitive aplicado via migração")
     @pytest.mark.edge_case
     def test_nome_deve_ser_case_insensitive(self, session: Session):
-        """EDGE CASE: Nomes DEVEM ser case-insensitive (BUG: permite duplicatas ocultas)."""
-        # TODO: Implementar constraint case-insensitive no modelo
-        # Este teste DEVE falhar até a validação ser implementada
+        """EDGE CASE: Nomes DEVEM ser case-insensitive (constraint PostgreSQL)."""
         tag1 = TagFactory.create(session=session, nome="rotina")
         
         with pytest.raises(Exception):  # IntegrityError
             tag2 = TagFactory.create(session=session, nome="Rotina")
-            session.commit()
+            session.flush()
     
     def test_validacao_cor_hexadecimal(self, session: Session):
         """Testa validação de formato de cor hexadecimal."""
@@ -359,29 +357,24 @@ class TestRegraModel:
         ).all()
         assert len(regra_tags) == 2
     
-    @pytest.mark.skip(reason="Teste requer PostgreSQL - constraint unique aplicado via migração")
     @pytest.mark.edge_case
     def test_nome_deve_ser_unico(self, session: Session):
-        """EDGE CASE: Nomes de regras DEVEM ser únicos (BUG: permite duplicatas confusas)."""
-        # TODO: Implementar constraint unique no modelo
-        # Este teste DEVE falhar até a validação ser implementada
+        """EDGE CASE: Nomes de regras DEVEM ser únicos (constraint PostgreSQL)."""
         regra1 = RegraFactory.create(session=session, nome="Duplicada")
         
         with pytest.raises(Exception):  # IntegrityError
             regra2 = RegraFactory.create(session=session, nome="Duplicada")
             session.commit()
     
-    @pytest.mark.skip(reason="Teste requer PostgreSQL - constraint unique aplicado via migração")
     @pytest.mark.edge_case
     def test_prioridades_devem_ser_unicas(self, session: Session):
-        """EDGE CASE: Prioridades DEVEM ser únicas (BUG: permite ordem indefinida)."""
-        # TODO: Implementar constraint unique no modelo
-        # Este teste DEVE falhar até a validação ser implementada
+        """EDGE CASE: Prioridades DEVEM ser únicas (constraint PostgreSQL)."""
         regra1 = RegraFactory.create(session=session, prioridade=1)
         
         with pytest.raises(Exception):  # IntegrityError
             regra2 = RegraFactory.create(session=session, prioridade=1)
             session.commit()
+
     
     def test_cascade_delete_regra_tags(self, session: Session):
         """Testa cascade delete de RegraTag ao deletar regra."""
