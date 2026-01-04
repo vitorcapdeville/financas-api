@@ -4,6 +4,7 @@ Modelos de tags e relacionamento com transações
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING, List
 from sqlmodel import SQLModel, Field, Relationship
+from pydantic import model_validator
 
 if TYPE_CHECKING:
     from app.models_regra import Regra, RegraTag
@@ -14,9 +15,12 @@ class Tag(SQLModel, table=True):
     """
     Modelo de Tag para categorização flexível de transações.
     Uma tag pode ser associada a múltiplas transações e regras.
+    
+    IMPORTANTE: Nomes são case-insensitive via índice único em LOWER(nome)
     """
+    
     id: Optional[int] = Field(default=None, primary_key=True)
-    nome: str = Field(index=True, unique=True, description="Nome único da tag")
+    nome: str = Field(index=True, description="Nome único da tag (case-insensitive)")
     cor: Optional[str] = Field(default=None, description="Cor hexadecimal para exibição (ex: #FF5733)")
     descricao: Optional[str] = Field(default=None, description="Descrição do propósito da tag")
     criado_em: datetime = Field(default_factory=datetime.now, description="Data de criação")
@@ -27,6 +31,14 @@ class Tag(SQLModel, table=True):
         back_populates="tag",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    
+    @model_validator(mode='after')
+    def normalizar_nome(self):
+        """Normaliza o nome para facilitar comparações case-insensitive"""
+        if self.nome:
+            # Mantém o nome original, mas será validado via índice no banco
+            self.nome = self.nome.strip()
+        return self
 
 
 class TransacaoTag(SQLModel, table=True):

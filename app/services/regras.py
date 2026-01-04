@@ -140,7 +140,7 @@ def aplicar_todas_regras_ativas(
         Número de regras aplicadas
     """
     # Busca todas as regras ativas ordenadas por prioridade DESC
-    stmt = select(Regra).where(Regra.ativo == True).order_by(Regra.prioridade.desc())
+    stmt = select(Regra).where(Regra.ativo).order_by(Regra.prioridade.desc())
     regras = session.exec(stmt).all()
     
     regras_aplicadas = 0

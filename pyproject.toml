@@ -38,7 +38,7 @@ addopts = [
     "--cov=app",
     "--cov-report=term-missing",
     "--cov-report=html",
-    # "--cov-fail-under=80",  # Temporariamente desabilitado durante implementação
+    "--cov-fail-under=80",  # Threshold mínimo: 80% overall, 90% para routers
 ]
 markers = [
     "unit: Unit tests",
@@ -47,6 +47,10 @@ markers = [
     "edge_case: Edge case tests",
 ]
 asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
 
 [tool.coverage.run]
 source = ["app"]

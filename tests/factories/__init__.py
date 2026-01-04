@@ -10,7 +10,7 @@ import random
 
 import factory
 from factory import Faker, LazyAttribute, SubFactory, post_generation
-from sqlmodel import Session
+from sqlmodel import Session, select, func
 
 from app.models import Transacao, TipoTransacao
 from app.models_config import Configuracao
@@ -168,12 +168,21 @@ class RegraFactory(BaseFactory):
     criterio_tipo = CriterioTipo.DESCRICAO_CONTEM
     criterio_valor = Faker('word', locale='pt_BR')
     acao_valor = "Categoria Padrão"
-    prioridade = 1
+    # Prioridade será auto-calculada no create()
+    prioridade = None
     ativo = True
     
     @classmethod
     def create(cls, session: Session = None, **kwargs):
         """Cria e persiste regra no banco."""
+        # Se prioridade não foi fornecida, auto-calcula
+        if session and 'prioridade' not in kwargs:
+            from sqlmodel import select, func
+            max_prioridade = session.exec(
+                select(func.max(Regra.prioridade))
+            ).first()
+            kwargs['prioridade'] = (max_prioridade or 0) + 1
+        
         obj = cls.build(**kwargs)
         if session:
             session.add(obj)

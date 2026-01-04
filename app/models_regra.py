@@ -41,16 +41,16 @@ class Regra(SQLModel, table=True):
     Regra para aplicação automática de alterações em transações.
     
     Campos:
-    - nome: Nome descritivo da regra
+    - nome: Nome descritivo da regra (único)
     - tipo_acao: Tipo de ação a executar (alterar_categoria, adicionar_tags, alterar_valor)
     - criterio_tipo: Como fazer matching (descricao_exata, descricao_contem, categoria)
     - criterio_valor: Valor a comparar (ex: "UBER", "Transporte")
     - acao_valor: Valor da ação (categoria, percentual 0-100, ou lista de tag IDs JSON)
-    - prioridade: Ordem de execução (maior = primeiro). Auto-calculado como max+1
+    - prioridade: Ordem de execução (maior = primeiro). Auto-calculado como max+1. Único.
     - ativo: Se a regra está ativa
     """
     id: Optional[int] = Field(default=None, primary_key=True)
-    nome: str = Field(description="Nome descritivo da regra", index=True)
+    nome: str = Field(description="Nome descritivo da regra", index=True, unique=True)
     tipo_acao: TipoAcao = Field(description="Tipo de ação a executar")
     criterio_tipo: CriterioTipo = Field(description="Tipo de critério de matching")
     criterio_valor: str = Field(description="Valor do critério para comparação")
@@ -59,7 +59,8 @@ class Regra(SQLModel, table=True):
     )
     prioridade: int = Field(
         description="Ordem de execução (maior = executada primeiro)",
-        index=True
+        index=True,
+        unique=True
     )
     ativo: bool = Field(default=True, description="Se a regra está ativa")
     criado_em: datetime = Field(default_factory=datetime.now)

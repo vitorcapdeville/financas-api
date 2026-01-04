@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from datetime import date, datetime
 from typing import Optional, TYPE_CHECKING, List
 from enum import Enum
+from pydantic import field_validator
 
 if TYPE_CHECKING:
     from app.models_tags import TransacaoTag
@@ -30,6 +31,17 @@ class Transacao(SQLModel, table=True):
     # Relacionamento com tags
     tags: list["TransacaoTag"] = Relationship(back_populates="transacao")
 
+    @field_validator('data_fatura')
+    @classmethod
+    def validar_data_fatura(cls, v: Optional[date], info) -> Optional[date]:
+        """Valida que data_fatura deve ser >= data"""
+        if v is not None:
+            # info.data contém os valores já validados
+            data_transacao = info.data.get('data')
+            if data_transacao and v < data_transacao:
+                raise ValueError("data_fatura deve ser maior ou igual a data")
+        return v
+
 
 class TransacaoCreate(SQLModel):
     """Schema para criação de transação"""
@@ -41,6 +53,16 @@ class TransacaoCreate(SQLModel):
     origem: str = "manual"
     observacoes: Optional[str] = None
     data_fatura: Optional[date] = None
+    
+    @field_validator('data_fatura')
+    @classmethod
+    def validar_data_fatura_create(cls, v: Optional[date], info) -> Optional[date]:
+        """Valida que data_fatura deve ser >= data"""
+        if v is not None:
+            data_transacao = info.data.get('data')
+            if data_transacao and v < data_transacao:
+                raise ValueError("data_fatura deve ser maior ou igual a data")
+        return v
 
 
 class TransacaoUpdate(SQLModel):
