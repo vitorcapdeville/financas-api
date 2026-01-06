@@ -309,4 +309,72 @@ class TestTransacoesRouterAvancado:
         
         assert response.status_code == 200
         transacoes = response.json()
-        assert len(transacoes) >= 2
+        assert len(transacoes) >= 2    
+    def test_resumo_mensal_com_filtro_tags(self, client):
+        """Deve filtrar resumo mensal por tags"""
+        # Criar tags
+        tag_importante = client.post("/tags", json={
+            "nome": "Importante",
+            "cor": "#FF0000"
+        }).json()
+        tag_normal = client.post("/tags", json={
+            "nome": "Normal",
+            "cor": "#00FF00"
+        }).json()
+        
+        # Criar transações de janeiro
+        t1 = client.post("/transacoes", json={
+            "data": "2024-01-10",
+            "descricao": "Entrada Importante",
+            "valor": 1000.0,
+            "tipo": "entrada"
+        }).json()
+        
+        t2 = client.post("/transacoes", json={
+            "data": "2024-01-15",
+            "descricao": "Saída Importante",
+            "valor": 300.0,
+            "tipo": "saida",
+            "categoria": "Alimentação"
+        }).json()
+        
+        t3 = client.post("/transacoes", json={
+            "data": "2024-01-20",
+            "descricao": "Saída Normal",
+            "valor": 500.0,
+            "tipo": "saida",
+            "categoria": "Transporte"
+        }).json()
+        
+        # Adicionar tags
+        client.post(f"/transacoes/{t1['id']}/tags/{tag_importante['id']}")
+        client.post(f"/transacoes/{t2['id']}/tags/{tag_importante['id']}")
+        client.post(f"/transacoes/{t3['id']}/tags/{tag_normal['id']}")
+        
+        # Resumo sem filtro - deve incluir todas
+        response_all = client.get("/transacoes/resumo/mensal", params={
+            "mes": 1,
+            "ano": 2024
+        })
+        assert response_all.status_code == 200
+        resumo_all = response_all.json()
+        assert resumo_all["total_entradas"] == 1000.0
+        assert resumo_all["total_saidas"] == 800.0  # 300 + 500
+        
+        # Resumo filtrado por tag "Importante" - deve incluir apenas t1 e t2
+        response_filtered = client.get("/transacoes/resumo/mensal", params={
+            "mes": 1,
+            "ano": 2024,
+            "tags": str(tag_importante['id'])
+        })
+        assert response_filtered.status_code == 200
+        resumo_filtered = response_filtered.json()
+        assert resumo_filtered["total_entradas"] == 1000.0
+        assert resumo_filtered["total_saidas"] == 300.0  # Apenas t2
+        assert resumo_filtered["saldo"] == 700.0
+        
+        # Verificar categorias filtradas
+        assert "Alimentação" in resumo_filtered["saidas_por_categoria"]
+        assert resumo_filtered["saidas_por_categoria"]["Alimentação"] == 300.0
+        # Transporte não deve aparecer porque t3 não tem a tag "Importante"
+        assert "Transporte" not in resumo_filtered["saidas_por_categoria"]

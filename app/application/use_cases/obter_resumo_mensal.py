@@ -6,7 +6,7 @@ from datetime import date
 
 from app.domain.repositories.transacao_repository import ITransacaoRepository
 from app.domain.repositories.configuracao_repository import IConfiguracaoRepository
-from app.application.dto.transacao_dto import ResumoMensalDTO, FiltrosTransacaoDTO
+from app.application.dto.transacao_dto import ResumoMensalDTO
 
 
 class ObterResumoMensalUseCase:
@@ -65,8 +65,8 @@ class ObterResumoMensalUseCase:
         except:
             criterio = "data_transacao"  # Default
         
-        # Criar filtros
-        filtros = FiltrosTransacaoDTO(
+        # Buscar transações com os filtros aplicados
+        transacoes = self._transacao_repository.listar(
             mes=mes,
             ano=ano,
             data_inicio=data_inicio,
@@ -74,9 +74,6 @@ class ObterResumoMensalUseCase:
             tag_ids=tag_ids,
             criterio_data=criterio
         )
-        
-        # Buscar transações
-        transacoes = self._transacao_repository.listar(filtros)
         
         # Agrupar por categoria e tipo
         entradas_por_categoria: Dict[str, float] = {}
