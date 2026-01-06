@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 from datetime import datetime, date
 
 from app.main import app
-from app.infrastructure.database.engine import engine
 from sqlmodel import Session, SQLModel, create_engine
 from sqlalchemy.pool import StaticPool
 

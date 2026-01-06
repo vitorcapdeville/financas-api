@@ -1,13 +1,12 @@
 """
 Configuração global de fixtures para testes
 """
+
 import pytest
 from datetime import date, datetime
 from unittest.mock import Mock
 from sqlmodel import Session, create_engine, SQLModel
 from sqlalchemy.pool import StaticPool
-
-# Fixtures globais que podem ser usadas em todos os testes
 
 
 @pytest.fixture
@@ -39,22 +38,22 @@ def db_session():
     from app.infrastructure.database.models.tag_model import TagModel  # noqa: F401
     from app.infrastructure.database.models.regra_model import RegraModel  # noqa: F401
     from app.infrastructure.database.models.configuracao_model import ConfiguracaoModel  # noqa: F401
-    
+
     # Criar engine em memória com pool estático para evitar problemas de concorrência
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    
+
     # Criar todas as tabelas
     SQLModel.metadata.create_all(engine)
-    
+
     # Criar sessão
     with Session(engine) as session:
         yield session
         session.rollback()  # Reverter qualquer mudança após o teste
-    
+
     # Limpar metadata
     SQLModel.metadata.drop_all(engine)
     engine.dispose()

@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -7,7 +8,20 @@ class Settings(BaseSettings):
         env_ignore_empty=True,
         extra="ignore",
     )
-    DATABASE_URL: str
-    
+    # Valor default para permitir importação em testes sem .env
+    DATABASE_URL: str = "sqlite:///:memory:"
 
-settings = Settings()
+
+_settings: Optional[Settings] = None
+
+
+def get_settings() -> Settings:
+    """Singleton lazy para Settings - permite override em testes"""
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
+
+
+# Compatibilidade com código existente
+settings = get_settings()
