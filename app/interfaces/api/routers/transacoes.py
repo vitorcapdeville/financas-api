@@ -51,7 +51,7 @@ from app.infrastructure.database.repositories.transacao_repository import Transa
 router = APIRouter(prefix="/transacoes", tags=["Transações"])
 
 
-@router.post("/", response_model=TransacaoResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TransacaoResponse, status_code=status.HTTP_201_CREATED)
 def criar_transacao(
     request: TransacaoCreateRequest,
     use_case: CriarTransacaoUseCase = Depends(get_criar_transacao_use_case)
@@ -90,7 +90,7 @@ def criar_transacao(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-@router.get("/", response_model=List[TransacaoResponse])
+@router.get("", response_model=List[TransacaoResponse])
 def listar_transacoes(
     mes: Optional[int] = Query(None, ge=1, le=12),
     ano: Optional[int] = Query(None, ge=2000),

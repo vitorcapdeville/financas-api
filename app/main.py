@@ -18,7 +18,12 @@ from app.interfaces.api.routers import regras
 from app.interfaces.api.routers import configuracoes
 from app.interfaces.api.routers import importacao
 
-app = FastAPI(title="Finanças Pessoais API", description="API para gerenciamento de finanças pessoais", version="2.0.0")
+app = FastAPI(
+    title="Finanças Pessoais API",
+    description="API para gerenciamento de finanças pessoais",
+    version="2.0.0",
+    redirect_slashes=False  # Desabilita redirect automático de trailing slashes
+)
 
 # CORS
 app.add_middleware(
