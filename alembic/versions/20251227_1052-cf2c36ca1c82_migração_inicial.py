@@ -49,10 +49,32 @@ def upgrade() -> None:
     
     # Criar índice unique na coluna chave
     op.create_index(op.f('ix_configuracoes_chave'), 'configuracoes', ['chave'], unique=True)
+    
+    # Inserir configurações default
+    from datetime import datetime
+    now = datetime.now()
+    
+    op.execute(
+        sa.text(
+            """
+            INSERT INTO configuracoes (chave, valor, criado_em, atualizado_em)
+            VALUES 
+                ('diaInicioPeriodo', '1', :now, :now),
+                ('criterio_data_transacao', 'data_transacao', :now, :now)
+            """
+        ).bindparams(now=now)
+    )
 
 
 def downgrade() -> None:
     """Remove as tabelas do schema."""
+    # Remover dados default (não é necessário, mas deixa explícito)
+    op.execute(
+        sa.text(
+            "DELETE FROM configuracoes WHERE chave IN ('diaInicioPeriodo', 'criterio_data_transacao')"
+        )
+    )
+    
     # Remover índice
     op.drop_index(op.f('ix_configuracoes_chave'), table_name='configuracoes')
     

@@ -12,8 +12,8 @@ from pathlib import Path
 # Adicionar o diretório raiz ao path para importar os módulos
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.config import settings
-from app.database import engine
+from app.infrastructure.config import settings
+from app.infrastructure.database.engine import engine
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -29,12 +29,12 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# Importar todos os modelos SQLModel
+# Importar todos os modelos SQLModel da nova estrutura (Clean Architecture)
 from sqlmodel import SQLModel
-from app.models import Transacao  # noqa: F401
-from app.models_config import Configuracao  # noqa: F401
-from app.models_tags import Tag, TransacaoTag  # noqa: F401
-from app.models_regra import Regra, RegraTag  # noqa: F401
+from app.infrastructure.database.models.transacao_model import TransacaoModel  # noqa: F401
+from app.infrastructure.database.models.configuracao_model import ConfiguracaoModel  # noqa: F401
+from app.infrastructure.database.models.tag_model import TagModel, TransacaoTagModel  # noqa: F401
+from app.infrastructure.database.models.regra_model import RegraModel, RegraTagModel  # noqa: F401
 
 target_metadata = SQLModel.metadata
 
