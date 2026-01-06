@@ -12,14 +12,15 @@ from pathlib import Path
 # Adicionar o diretório raiz ao path para importar os módulos
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.infrastructure.config import settings
-from app.infrastructure.database.engine import engine
+from app.infrastructure.config import get_settings
+from app.infrastructure.database.engine import get_engine
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 # Configurar a URL do banco de dados a partir das configurações
+settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Interpret the config file for Python logging.
@@ -76,7 +77,7 @@ def run_migrations_online() -> None:
 
     """
     # Usar o engine já configurado no projeto
-    connectable = engine
+    connectable = get_engine()
 
     with connectable.connect() as connection:
         context.configure(
